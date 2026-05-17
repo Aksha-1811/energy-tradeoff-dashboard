@@ -116,6 +116,13 @@ def build_payload(
     # forecast for line chart (next 24 steps)
     summary["forecast"] = pred["forecast"]
 
+    operational_summary = build_operational_summary(
+        forecast=pred["forecast"],
+        feature_importance=pred["featureImportance"],
+        df=labeled,
+        target_col="Y",
+    )
+
     return {
         "meta": {
             "seed": cfg.seed,
@@ -125,7 +132,54 @@ def build_payload(
         },
         "thresholds": {"medianY": float(median_y)},
         "summary": summary,
+        "operational_summary": operational_summary,
         "rows": labeled.to_dict(orient="records"),
+    }
+
+
+def build_operational_summary(
+    forecast: List[Dict[str, Any]],
+    feature_importance: Dict[str, float],
+    df: pd.DataFrame,
+    target_col: str = "Y",
+) -> Dict[str, Any]:
+    y_values = df[target_col].to_numpy()
+
+    peak_forecast = float(max(item["yHat"] for item in forecast))
+    average_forecast = float(np.mean([item["yHat"] for item in forecast]))
+
+    hist_counts, bin_edges = np.histogram(y_values, bins=12)
+    top_bin_idx = int(np.argmax(hist_counts))
+    typical_zone = f"{bin_edges[top_bin_idx]:.1f}–{bin_edges[top_bin_idx + 1]:.1f}"
+
+    top_feature_key = max(feature_importance, key=feature_importance.get)
+    feature_labels = {
+        "X1": "Heat Pump (X1)",
+        "X2": "PV / Solar Generation (X2)",
+        "X3": "EV Charging (X3)",
+        "X4": "Washing Machine (X4)",
+        "X5": "Dishwasher (X5)",
+    }
+
+    risk_level = (
+        "Elevated"
+        if peak_forecast > average_forecast * 1.08
+        else "Moderate" if peak_forecast > average_forecast * 1.03 else "Stable"
+    )
+
+    recommendation = (
+        "Monitor high-load periods and shift flexible appliance usage when forecasted grid import is high."
+        if risk_level in ["Moderate", "Elevated"]
+        else "System appears stable. Continue monitoring operating patterns and maintain current scheduling strategy."
+    )
+
+    return {
+        "risk_level": risk_level,
+        "peak_forecast": peak_forecast,
+        "average_forecast": average_forecast,
+        "typical_zone": typical_zone,
+        "top_feature": feature_labels.get(top_feature_key, top_feature_key),
+        "recommendation": recommendation,
     }
 
 

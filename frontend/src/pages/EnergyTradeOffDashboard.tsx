@@ -62,6 +62,14 @@ type EnergyApiResponse = {
     forecast?: { step: number; yHat: number }[];
   };
   rows: EnergyRow[];
+  operational_summary?: {
+    risk_level: string;
+    peak_forecast: number;
+    average_forecast: number;
+    typical_zone: string;
+    top_feature: string;
+    recommendation: string;
+  };
 };
 
 const API_BASE = "http://localhost:8004";
@@ -135,6 +143,7 @@ function baseChartOptions(
         title: { display: true, text: titleX, color: chartTheme.muted },
         ticks: {
           color: chartTheme.muted,
+          font: { size: 10 },
           callback: function (value: any): string {
             // @ts-expect-error - Chart.js runtime provides this
             const label = this.getLabelForValue
@@ -155,6 +164,7 @@ function baseChartOptions(
         title: { display: true, text: titleY, color: chartTheme.muted },
         ticks: {
           color: chartTheme.muted,
+          font: { size: 10 },
           callback: (val: any) => {
             const n = Number(val);
             if (!Number.isFinite(n)) return String(val);
@@ -404,13 +414,38 @@ const EnergyTradeoffDashboard: React.FC = () => {
   const [data, setData] = useState<EnergyApiResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [selectedPoints, setSelectedPoints] = useState<EnergyRow[]>([]);
+  const [isInsightPanelOpen, setIsInsightPanelOpen] = useState(false);
 
   const [sampleRows, setSampleRows] = useState(650);
   const [seed, setSeed] = useState(225451065);
 
   const [xFeature, setXFeature] = useState<FeatureKey>("X1"); // default: Heat Pump
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const behaviorChartRef = useRef<HTMLDivElement | null>(null);
   const navigate = useNavigate();
+  const getPointId = (point: EnergyRow) =>
+    `${point.X1}-${point.X2}-${point.X3}-${point.X4}-${point.X5}-${point.Y}`;
+
+  const addInsightPoint = (point: EnergyRow) => {
+    setSelectedPoints((prev) => {
+      const exists = prev.some((p) => getPointId(p) === getPointId(point));
+      if (exists) return prev;
+      return [...prev, point];
+    });
+
+    setIsInsightPanelOpen(true);
+  };
+
+  const removeInsightPoint = (point: EnergyRow) => {
+    setSelectedPoints((prev) =>
+      prev.filter((p) => getPointId(p) !== getPointId(point)),
+    );
+  };
+
+  const clearInsightPoints = () => {
+    setSelectedPoints([]);
+  };
 
   async function loadDefault() {
     setLoading(true);
@@ -495,8 +530,81 @@ const EnergyTradeoffDashboard: React.FC = () => {
   }, [data]);
 
   const modelMetrics = data?.summary.modelMetrics ?? null;
+  const operationalSummary = useMemo(() => {
+    if (!forecast || !histogram || !featureImportance) return null;
+
+    const peakForecast = Math.max(...forecast.values);
+    const avgForecast =
+      forecast.values.reduce((sum, value) => sum + value, 0) /
+      forecast.values.length;
+
+    const maxCount = Math.max(...histogram.counts);
+    const typicalZoneIndex = histogram.counts.indexOf(maxCount);
+    const typicalZone = histogram.labels[typicalZoneIndex];
+
+    const topFeature = featureImportance.labels[0] ?? "main energy driver";
+
+    const riskLevel =
+      peakForecast > avgForecast * 1.08
+        ? "Elevated"
+        : peakForecast > avgForecast * 1.03
+          ? "Moderate"
+          : "Stable";
+
+    return {
+      peakForecast,
+      avgForecast,
+      typicalZone,
+      topFeature,
+      riskLevel,
+    };
+  }, [forecast, histogram, featureImportance]);
 
   // D3 scatter
+  const [showChartGuide, setShowChartGuide] = useState(true);
+
+  useEffect(() => {
+    if (!behaviorChartRef.current) return;
+
+    let repeatInterval: ReturnType<typeof setInterval>;
+    let hideTimer: ReturnType<typeof setTimeout>;
+
+    const showGuide = () => {
+      setShowChartGuide(true);
+
+      hideTimer = setTimeout(() => {
+        setShowChartGuide(false);
+      }, 3000);
+    };
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          showGuide();
+
+          repeatInterval = setInterval(() => {
+            showGuide();
+          }, 120000);
+        } else {
+          setShowChartGuide(false);
+          clearInterval(repeatInterval);
+          clearTimeout(hideTimer);
+        }
+      },
+      {
+        threshold: 0.45,
+      },
+    );
+
+    observer.observe(behaviorChartRef.current);
+
+    return () => {
+      observer.disconnect();
+      clearInterval(repeatInterval);
+      clearTimeout(hideTimer);
+    };
+  }, []);
+
   useEffect(() => {
     if (!data || !svgRef.current) return;
 
@@ -523,7 +631,7 @@ const EnergyTradeoffDashboard: React.FC = () => {
       .nice()
       .range([height - margin.bottom, margin.top]);
 
-    svg
+    const xAxis = svg
       .append("g")
       .attr("transform", `translate(0,${height - margin.bottom})`)
       .call(
@@ -532,7 +640,8 @@ const EnergyTradeoffDashboard: React.FC = () => {
           .ticks(6)
           .tickFormat((d) => roundTick(Number(d))),
       );
-    svg
+
+    const yAxis = svg
       .append("g")
       .attr("transform", `translate(${margin.left},0)`)
       .call(
@@ -542,12 +651,28 @@ const EnergyTradeoffDashboard: React.FC = () => {
           .tickFormat((d) => roundTick(Number(d))),
       );
 
+    xAxis
+      .selectAll("text")
+      .style("font-size", "16px")
+      .style("font-weight", "500")
+      .style("fill", "#6B7280");
+
+    yAxis
+      .selectAll("text")
+      .style("font-size", "16px")
+      .style("font-weight", "500")
+      .style("fill", "#6B7280");
+
+    xAxis.selectAll("path,line").style("stroke", "#9CA3AF");
+
+    yAxis.selectAll("path,line").style("stroke", "#9CA3AF");
+
     svg
       .append("text")
       .attr("x", width / 2)
-      .attr("y", height - 16)
+      .attr("y", height - 12)
       .attr("text-anchor", "middle")
-      .attr("font-size", 12)
+      .attr("font-size", 18)
       .attr("fill", "#374151")
       .text(`${xMeta.label} (${xMeta.unit})`);
 
@@ -557,7 +682,7 @@ const EnergyTradeoffDashboard: React.FC = () => {
       .attr("x", -height / 2)
       .attr("y", 18)
       .attr("text-anchor", "middle")
-      .attr("font-size", 12)
+      .attr("font-size", 18)
       .attr("fill", "#374151")
       .text(`Grid Import (Y) (${UNITS.energy})`);
 
@@ -576,7 +701,7 @@ const EnergyTradeoffDashboard: React.FC = () => {
       .attr("x", width - margin.right)
       .attr("y", y(medianY) - 8)
       .attr("text-anchor", "end")
-      .attr("font-size", 12)
+      .attr("font-size", 18)
       .attr("fill", "#6B7280")
       .text("Efficiency boundary (median Y)");
 
@@ -623,18 +748,51 @@ const EnergyTradeoffDashboard: React.FC = () => {
       .attr("r", 3.2)
       .attr("fill", (d) => (d.Y >= medianY ? "#EF4444" : "#10B981"))
       .attr("opacity", 0.75)
+      .style("cursor", "pointer")
+      .attr("stroke", (d) =>
+        selectedPoints.some((p) => getPointId(p) === getPointId(d))
+          ? "#111827"
+          : "none",
+      )
+      .attr("stroke-width", (d) =>
+        selectedPoints.some((p) => getPointId(p) === getPointId(d)) ? 2 : 0,
+      )
+      .attr("r", (d) =>
+        selectedPoints.some((p) => getPointId(p) === getPointId(d)) ? 6.5 : 4.2,
+      )
+      .on("click", function (event, d) {
+        addInsightPoint(d);
+      })
       .on("mouseenter", function (event, d) {
+        d3.select(this)
+          .transition()
+          .duration(120)
+          .attr("r", 7.5)
+          .attr("opacity", 1);
+
         show(event as any, d);
       })
       .on("mousemove", function (event) {
         move(event as any);
       })
-      .on("mouseleave", hide);
+      .on("mouseleave", function (event, d) {
+        const isSelected = selectedPoints.some(
+          (p) => getPointId(p) === getPointId(d),
+        );
+
+        d3.select(this)
+          .transition()
+          .duration(120)
+          .attr("r", isSelected ? 6.5 : 4.2)
+          .attr("opacity", 0.8);
+
+        hide();
+      });
 
     return () => {
       tooltip.remove();
     };
-  }, [data, xFeature, xMeta.label, xMeta.unit]);
+  }, [data, xFeature, xMeta.label, xMeta.unit, selectedPoints]);
 
   const featureOptions = useMemo(() => {
     const keys: FeatureKey[] = ["X1", "X2", "X3", "X4", "X5"];
@@ -728,26 +886,30 @@ const EnergyTradeoffDashboard: React.FC = () => {
                   </div>
 
                   <div className="mt-4">
-                    <label className="text-xs text-white/60">
+                    <label className="text-xs text-white/60 w-full">
                       <span className="block mb-1">X-axis Feature</span>
-                      <select
-                        value={xFeature}
-                        onChange={(e) =>
-                          setXFeature(e.target.value as FeatureKey)
-                        }
-                        className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-2.5 mr-12 text-sm text-white outline-none
-                        focus:border-purple-400/60 focus:ring-2 focus:ring-purple-500/20"
-                      >
-                        {featureOptions.map((opt) => (
-                          <option
-                            key={opt.key}
-                            value={opt.key}
-                            className="bg-[#0B0712] text-white"
-                          >
-                            {opt.text}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="relative w-full">
+                        <select
+                          value={xFeature}
+                          onChange={(e) =>
+                            setXFeature(e.target.value as FeatureKey)
+                          }
+                          className="w-full appearance-none rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm text-white outline-none focus:border-purple-400/60 focus:ring-2 focus:ring-purple-500/20"
+                        >
+                          {featureOptions.map((opt) => (
+                            <option
+                              key={opt.key}
+                              value={opt.key}
+                              className="bg-[#0B0712] text-white"
+                            >
+                              {opt.text}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-white">
+                          ▼
+                        </span>
+                      </div>
                     </label>
                   </div>
 
@@ -836,7 +998,7 @@ const EnergyTradeoffDashboard: React.FC = () => {
                     ? "—"
                     : `${formatNum(applianceMedians.dishwasher)} ${UNITS.power}`
                 }
-                hint="Typical dishwasher load level (median reduces effect of outliers)."
+                hint="Typical dishwasher load level."
               />
               <InsightChip
                 label="Heat pump median (X1)"
@@ -845,7 +1007,7 @@ const EnergyTradeoffDashboard: React.FC = () => {
                     ? "—"
                     : `${formatNum(applianceMedians.heatPump)} ${UNITS.power}`
                 }
-                hint="Typical heat pump load (median is a stable ‘typical value’)."
+                hint="Typical heat pump load."
               />
               <InsightChip
                 label={`Current Load Level (Mean Y, ${UNITS.energy})`}
@@ -871,7 +1033,10 @@ const EnergyTradeoffDashboard: React.FC = () => {
           subtitle="How operating conditions influence grid import"
         >
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <div className="relative rounded-2xl border bg-white p-4 shadow-sm overflow-visible">
+            <div
+              ref={behaviorChartRef}
+              className="relative rounded-2xl border bg-white p-4 shadow-sm overflow-visible"
+            >
               <InfoTip title="Response Map (Scatter + Median Threshold)">
                 <div className="space-y-2">
                   <div>
@@ -890,18 +1055,23 @@ const EnergyTradeoffDashboard: React.FC = () => {
                   </div>
                 </div>
               </InfoTip>
+              {showChartGuide && (
+                <div className="pointer-events-none absolute left-[58%] top-[40%] z-30 flex items-center gap-2">
+                  <div className="animate-ping absolute h-8 w-8 rounded-full bg-violet-400/40" />
 
+                  <div className="animate-bounce text-xl">👆</div>
+                </div>
+              )}
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold">
                   Response Map (Scatter)
                 </h3>
               </div>
+
               <div className="mt-3 overflow-hidden rounded-xl border bg-gray-50">
                 <svg ref={svgRef} className="w-full" />
               </div>
               <p className="mt-3 text-xs text-gray-600">
-                X-axis: {xMeta.label} ({xMeta.unit}). <br />
-                Y-axis: Grid import (Y) ({UNITS.energy}). <br />
                 Red indicates above-boundary usage.
               </p>
             </div>
@@ -1006,7 +1176,7 @@ const EnergyTradeoffDashboard: React.FC = () => {
               </div>
 
               {modelMetrics ? (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-5 mr-4">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-5 mr-20">
                   <div className="rounded-xl border bg-gray-50 px-3 py-2">
                     <div className="text-[11px] text-gray-500">Test R²</div>
                     <div className="text-sm font-semibold">
@@ -1150,6 +1320,75 @@ const EnergyTradeoffDashboard: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {operationalSummary && (
+            <div className="mt-6 rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-fuchsia-50 p-5 shadow-sm">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-violet-700">
+                    AI Operational Summary
+                  </p>
+
+                  <h3 className="mt-2 text-lg font-semibold text-slate-900">
+                    System outlook: {operationalSummary.riskLevel} demand risk
+                  </h3>
+
+                  <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-600">
+                    The model forecasts future grid import, identifies the most
+                    common operating range, and highlights the strongest energy
+                    driver for decision support.
+                  </p>
+                </div>
+
+                <span className="rounded-full bg-violet-600 px-4 py-2 text-xs font-semibold text-white shadow-sm">
+                  Decision Insight
+                </span>
+              </div>
+
+              <div className="mt-5 grid gap-4 md:grid-cols-3">
+                <div className="rounded-xl border bg-white p-4">
+                  <p className="text-xs text-slate-500">Peak forecast</p>
+                  <p className="mt-1 text-lg font-bold text-slate-900">
+                    {formatNum(operationalSummary.peakForecast)} {UNITS.energy}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Highest predicted grid import in the short horizon.
+                  </p>
+                </div>
+
+                <div className="rounded-xl border bg-white p-4">
+                  <p className="text-xs text-slate-500">
+                    Typical operating zone
+                  </p>
+                  <p className="mt-1 text-lg font-bold text-slate-900">
+                    {operationalSummary.typicalZone}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Most frequent grid import range in the sampled data.
+                  </p>
+                </div>
+
+                <div className="rounded-xl border bg-white p-4">
+                  <p className="text-xs text-slate-500">Main influence</p>
+                  <p className="mt-1 text-lg font-bold text-slate-900">
+                    {operationalSummary.topFeature}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Strongest feature based on model importance.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-5 rounded-xl bg-white/80 p-4 text-sm leading-relaxed text-slate-700">
+                <span className="font-semibold text-violet-700">
+                  Recommendation:
+                </span>{" "}
+                Monitor high-load periods and shift flexible appliance usage
+                when forecasted grid import is high. This helps reduce peak
+                consumption and improves energy efficiency.
+              </div>
+            </div>
+          )}
         </Section>
 
         {/* IMPORTANCE */}
@@ -1202,6 +1441,117 @@ const EnergyTradeoffDashboard: React.FC = () => {
             </div>
           </div>
         </Section>
+        {selectedPoints.length > 0 && !isInsightPanelOpen && (
+          <button
+            type="button"
+            onClick={() => setIsInsightPanelOpen(true)}
+            className="fixed right-0 top-1/2 z-40 -translate-y-1/2 rounded-l-2xl bg-violet-600 px-3 py-5 text-white shadow-xl transition hover:bg-violet-700"
+            aria-label="Open insight panel"
+          >
+            ←
+          </button>
+        )}
+
+        {isInsightPanelOpen && selectedPoints.length > 0 && data && (
+          <aside className="fixed right-0 top-0 z-50 flex h-screen w-[380px] flex-col border-l border-slate-200 bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">
+                  Insight Panel
+                </h2>
+                <p className="text-xs text-slate-500">
+                  {selectedPoints.length} selected operating point
+                  {selectedPoints.length > 1 ? "s" : ""}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsInsightPanelOpen(false)}
+                className="rounded-full px-3 py-1 text-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Close insight panel"
+              >
+                →
+              </button>
+            </div>
+
+            <div className="flex-1 space-y-4 overflow-y-auto p-5">
+              <button
+                type="button"
+                onClick={clearInsightPoints}
+                className="w-full rounded-xl border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-700 transition hover:bg-violet-100"
+              >
+                Clear all insights
+              </button>
+
+              {selectedPoints.map((point, index) => {
+                const isHigh = point.Y >= data.thresholds.medianY;
+
+                return (
+                  <div
+                    key={getPointId(point)}
+                    className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                  >
+                    <div className="mb-3 flex items-start justify-between">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-violet-700">
+                        ⚡ Operating Point {index + 1}
+                      </p>
+
+                      <button
+                        type="button"
+                        onClick={() => removeInsightPoint(point)}
+                        className="rounded-full px-2 text-sm font-bold text-slate-400 hover:bg-slate-100 hover:text-red-500"
+                        aria-label={`Remove operating point ${index + 1}`}
+                      >
+                        ×
+                      </button>
+                    </div>
+
+                    <div className="space-y-2 text-sm text-slate-700">
+                      <p>
+                        <span className="font-semibold text-slate-900">
+                          {xMeta.label}:
+                        </span>{" "}
+                        {formatNum(point[xFeature])} {xMeta.unit}
+                      </p>
+
+                      <p>
+                        <span className="font-semibold text-slate-900">
+                          Grid Import:
+                        </span>{" "}
+                        {formatNum(point.Y)} {UNITS.energy}
+                      </p>
+
+                      <p>
+                        <span className="font-semibold text-slate-900">
+                          Status:
+                        </span>{" "}
+                        {isHigh ? (
+                          <span className="font-semibold text-red-600">
+                            High Consumption
+                          </span>
+                        ) : (
+                          <span className="font-semibold text-emerald-600">
+                            Efficient Range
+                          </span>
+                        )}
+                      </p>
+
+                      <div className="rounded-xl bg-violet-50 p-3 text-xs leading-relaxed">
+                        <span className="font-semibold text-violet-700">
+                          Recommendation:
+                        </span>{" "}
+                        {isHigh
+                          ? "Review heat pump load or shift usage window."
+                          : "Current operating point is within efficient range."}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </aside>
+        )}
       </div>
     </div>
   );

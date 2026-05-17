@@ -134,12 +134,14 @@ python -m uvicorn app.main:app --reload --port 8004
 
 ## 🔗 Source Code
 
-GitHub: _(add your repo link here)_
+GitHub: https://github.com/Aksha-1811/energy-tradeoff-dashboard
 
 ---
 
 ## 👩‍💻 Author
 
 **Akshaya Balakrishnan**
+
 Frontend Developer
+
 Munich, Germany

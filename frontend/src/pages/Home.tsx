@@ -30,7 +30,7 @@ const Home: React.FC = () => {
 
               <div className="flex flex-wrap gap-4">
                 <Link to="/energy-tradeoff">
-                  <Button className="bg-violet-600 border-0 hover:bg-violet-700 px-4 py-2 text-white font-medium">
+                  <Button className="bg-violet-700 border-0 hover:bg-violet-800 px-4 py-2 text-white font-medium rounded-lg">
                     Open Dashboard
                   </Button>
                 </Link>
@@ -41,12 +41,24 @@ const Home: React.FC = () => {
 
         <section className="max-w-6xl mx-auto px-6 py-14">
           <div className="grid gap-8 md:grid-cols-3">
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-              <div className="text-violet-600 text-4xl">
+            <div
+              className="group bg-white rounded-2xl shadow-sm border border-slate-200 p-6
+      transition-all duration-300 ease-out
+      hover:hover:scale-[1.04] hover:shadow-2xl hover:border-violet-300
+      hover:bg-gradient-to-br hover:from-white hover:to-violet-50"
+            >
+              <div
+                className="w-14 h-14 flex items-center justify-center rounded-xl
+        bg-violet-100 text-violet-600 text-3xl mb-5
+        transition-all duration-300
+        group-hover:bg-violet-600
+        group-hover:text-white
+        group-hover:scale-110"
+              >
                 <AiOutlineLineChart />
               </div>
 
-              <h3 className="text-xl font-semibold text-slate-800 mt-3 mb-3">
+              <h3 className="text-xl font-semibold text-slate-800 mb-3">
                 Visual Analytics
               </h3>
 
@@ -57,27 +69,54 @@ const Home: React.FC = () => {
               </p>
             </div>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-              <div className="text-violet-600 text-4xl">
+            <div
+              className="group bg-white rounded-2xl shadow-sm border border-slate-200 p-6
+      transition-all duration-300 ease-out
+      hover:hover:scale-[1.04] hover:shadow-2xl hover:border-violet-300
+      hover:bg-gradient-to-br hover:from-white hover:to-violet-50"
+            >
+              <div
+                className="w-14 h-14 flex items-center justify-center rounded-xl
+        bg-violet-100 text-violet-600 text-3xl mb-5
+        transition-all duration-300
+        group-hover:bg-violet-600
+        group-hover:text-white
+        group-hover:scale-110"
+              >
                 <MdInsights />
               </div>
 
-              <h3 className="text-xl font-semibold text-slate-800 mt-3 mb-3">
+              <h3 className="text-xl font-semibold text-slate-800 mb-3">
                 Predictive Insight
               </h3>
+
               <p className="text-slate-600 leading-relaxed">
                 Move beyond static charts with forecasting, feature importance,
                 and model-backed summaries that help explain energy behavior.
               </p>
             </div>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-              <div className="text-violet-600 text-4xl">
+            <div
+              className="group bg-white rounded-2xl shadow-sm border border-slate-200 p-6
+      transition-all duration-300 ease-out
+      hover:hover:scale-[1.04] hover:shadow-2xl hover:border-violet-300
+      hover:bg-gradient-to-br hover:from-white hover:to-violet-50"
+            >
+              <div
+                className="w-14 h-14 flex items-center justify-center rounded-xl
+        bg-violet-100 text-violet-600 text-3xl mb-5
+        transition-all duration-300
+        group-hover:bg-violet-600
+        group-hover:text-white
+        group-hover:scale-110"
+              >
                 <FiCode />
               </div>
-              <h3 className="text-xl font-semibold text-slate-800 mt-3 mb-3">
+
+              <h3 className="text-xl font-semibold text-slate-800 mb-3">
                 Frontend Engineering
               </h3>
+
               <p className="text-slate-600 leading-relaxed">
                 This project highlights my ability to transform academic work
                 into a clean, user-facing frontend application with strong UI
