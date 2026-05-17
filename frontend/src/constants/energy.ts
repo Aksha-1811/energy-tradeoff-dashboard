@@ -1,6 +1,7 @@
 import { FeatureKey } from "../types/energy";
 
-export const API_BASE = "http://localhost:8004";
+export const API_BASE =
+  process.env.REACT_APP_API_BASE || "http://localhost:8004";
 
 export const UNITS = {
   power: "W",
