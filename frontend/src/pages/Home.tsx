@@ -14,7 +14,7 @@ const Home: React.FC = () => {
           <div className="max-w-6xl mx-auto px-6 py-20 md:py-28">
             <div className="max-w-4xl">
               <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-medium mb-6">
-                Energy Analytics Portfolio Project
+                Applied AI - Frontend Engineering Project
               </div>
 
               <h1 className="text-4xl md:text-5xl font-bold leading-tight mb-6">
@@ -22,10 +22,11 @@ const Home: React.FC = () => {
               </h1>
 
               <p className="text-lg md:text-xl text-slate-200 leading-relaxed mb-8 max-w-3xl">
-                An interactive frontend application built from my master’s final
-                project, designed to explore residential energy consumption,
-                analyze efficiency trade-offs, visualize patterns using D3.js,
-                and surface predictive insights through an intuitive dashboard.
+                An applied AI analytics dashboard built from my master’s energy
+                intelligence project, combining React, D3.js, Chart.js, and
+                FastAPI to analyze energy behavior, forecast grid demand,
+                estimate operational risk, and deliver explainable decision
+                insights through an interactive frontend experience.
               </p>
 
               <div className="flex flex-wrap gap-4">
@@ -63,9 +64,10 @@ const Home: React.FC = () => {
               </h3>
 
               <p className="text-slate-600 leading-relaxed">
-                Explore energy usage patterns, compare variables, and identify
-                high-consumption zones through interactive visualizations built
-                with D3.js.
+                Interactive behavioral analysis using D3.js to explore operating
+                conditions, identify high-consumption zones, compare energy
+                drivers, and inspect individual observations with drill-down
+                insights.
               </p>
             </div>
 
@@ -91,8 +93,10 @@ const Home: React.FC = () => {
               </h3>
 
               <p className="text-slate-600 leading-relaxed">
-                Move beyond static charts with forecasting, feature importance,
-                and model-backed summaries that help explain energy behavior.
+                AI-powered forecasting and risk estimation using machine
+                learning models to predict grid import, highlight operational
+                risk, surface feature importance, and generate actionable system
+                recommendations.
               </p>
             </div>
 
@@ -118,9 +122,10 @@ const Home: React.FC = () => {
               </h3>
 
               <p className="text-slate-600 leading-relaxed">
-                This project highlights my ability to transform academic work
-                into a clean, user-facing frontend application with strong UI
-                structure and data storytelling.
+                Production-style frontend engineering with modular React
+                architecture, reusable analytics components, guided UX
+                interactions, backend API integration, and dashboard-focused
+                data storytelling.
               </p>
             </div>
           </div>

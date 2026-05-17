@@ -143,5 +143,4 @@ GitHub: https://github.com/Aksha-1811/energy-tradeoff-dashboard
 **Akshaya Balakrishnan**
 
 Frontend Developer
-
 Munich, Germany

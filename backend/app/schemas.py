@@ -44,8 +44,18 @@ class Summary(BaseModel):
     forecast: Optional[List[ForecastPoint]] = None
 
 
+class OperationalSummary(BaseModel):
+    risk_level: str
+    peak_forecast: float
+    average_forecast: float
+    typical_zone: str
+    top_feature: str
+    recommendation: str
+
+
 class EnergyResponse(BaseModel):
     meta: Dict[str, object]
     thresholds: Dict[str, float]
     summary: Summary
+    operational_summary: OperationalSummary
     rows: List[EnergyRow]
